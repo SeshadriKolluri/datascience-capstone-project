@@ -1,0 +1,141 @@
+---
+title: "Data Science Capstone Project - Milestone Report"
+author: "Seshadri K"
+date: "10/21/2017"
+output: html_document
+---
+## Overview
+
+The goal of this milestone report is to demonstrate author has completed some basic steps towards developing an algorithm to predict the next words in a sentence using the Swiftkey database, for the Data Science Capstone Project on Coursera. 
+
+The code presented in the following sections intends to demonstrate the following: 
+
+* Downloading the data and loading it into R working environment
+* Create a basic report of summary statistics about the data sets
+* Perform exploratory data analysis to illustrate features of the data
+* Report any interesting findings from the exploratory data analysis
+* Present the plans for creating a prediction algorithm and Shiny app
+
+
+## Downloading the files and loading the data
+
+```{r echo=FALSE, message=FALSE}
+require(readtext)
+require(quanteda)
+```
+
+
+```{r}
+
+zipped_data<-'Coursera-SwiftKey.zip'
+
+#Check if the file already exists, and download if it doesn't exist already
+
+if(!file.exists(zipped_data)){
+    download.file(destfile = trainingfile,method='curl',
+                  url='https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip')}
+if(!file.exists('./final')){
+  unzip(zipped_data)
+}
+
+data_directgory <- './final/en_US'
+system2("rm", paste0(data_directgory,"/*sampled*.txt"))
+file_names <- list.files(data_directgory)
+```
+
+## Basic Summaries of three files
+
+In this section, we summarize the basic properties of the three files being used for the Corpus creation, using the following code. It can be seen that each file is in excess of 150 MB, containing more than 30 million words.  A smaller sample of each file would be used for further analysis. 
+
+```{r results='asis'}
+library(knitr)
+
+file_sizes <- sapply(file_names,function(x) utils:::format.object_size(file.info(paste0(data_directgory,"/",x))$size,"auto"))
+num_lines <- sapply(file_names,function(x) as.integer(system2("wc", paste0("-l < ",data_directgory,"/",x), stdout=TRUE)))
+num_words <- sapply(file_names,function(x) as.integer(system2("wc", paste0("-w < ",data_directgory,"/",x), stdout=TRUE)))
+
+x <- rbind(file_sizes,num_lines,num_words)
+row.names(x) <- c("File Size","Number of Lines", "Number of Words")
+kable(x)
+```
+
+## Sampling Data and Creating Corpus
+
+In this section we sample a small section of the test files (say 10%) and combine them to create a corpus. This corpus will be later used for model training and prediciton algorithmm developmment. I have used a perl statement to efficiently implement this sampling. 
+
+```{r results='hide'}
+sapply(file_names, function(x) system2("cat",paste0(data_directgory,"/",x," | perl -n -e 'print if (rand() < .1)' >",data_directgory,"/",x,"_sampled.txt")))
+```
+
+
+```{r}
+sampled_corpus <- corpus(readtext(paste0(data_directgory,"/*sampled*.txt")))
+```
+
+## Exploratory Data Analysis
+
+In this section we explore the sampled data, starting with a basic sumary of the sampled corpus, and continuing with the bar plots of various n-grams generated from the corpus. 
+
+```{r}
+summary(sampled_corpus)
+```
+
+### Generate N-grams, remove profane words 
+```{r}
+profanity.file <- "profanity.txt"
+if(!file.exists(profanity.file)){
+    download.file(destfile = profanity.file,method='curl',
+      url='https://raw.githubusercontent.com/shutterstock/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en')}
+
+profanity <- readLines(profanity.file)
+
+dfm_1grams <- dfm(tokenize(sampled_corpus,remove_punct = TRUE, ngrams = 1L),remove=profanity)
+dfm_2grams <- dfm(tokenize(sampled_corpus,remove_punct = TRUE, ngrams = 2L),remove=profanity)
+dfm_3grams <- dfm(tokenize(sampled_corpus,remove_punct = TRUE, ngrams = 3L),remove=profanity)
+
+```
+
+## Plotting Top Features
+
+```{r}
+
+barplot(topfeatures(dfm_1grams,10),horiz=T,xlab = "Frequency of 1-grams",main = "1-gram Frequency in Sample Corpus",las=1)
+
+```
+
+```{r}
+
+barplot(topfeatures(dfm_2grams,10),horiz=T,xlab = "Frequency of 2-grams",main = "2-gram Frequency in Sample Corpus",las=1)
+
+```
+
+```{r}
+par(mar=c(5,7,4,1)+.1)
+barplot(topfeatures(dfm_3grams,10),horiz=T,xlab = "Frequency of 3-grams",main = "3-gram Frequency in Sample Corpus",las=1)
+
+```
+
+## Observations
+
+It can be observed that the most-popular 1-grams are words like "the", "to" etc., which are important for a typing prediction software, but don't convey much information about the texts being analyzed. These are usually called the "stop words".
+
+If we are curious about the most common words that are not "stop words", we can use "remove stop words" option in the dfm function as shown below. 
+
+
+```{r}
+dfm_1grams_without_stopwords <- dfm(tokenize(sampled_corpus,remove_punct = TRUE, ngrams = 1L),remove=c(profanity, stopwords(kind="english")))
+
+barplot(topfeatures(dfm_1grams_without_stopwords,10),horiz=T,xlab = "Frequency of 1-grams (without stop words)",main = "1-gram Frequency in Sample Corpus (without stop words)",las=1)
+
+```
+
+From the histograms, it appears that we should use some sort of a combination of various N-grams to build the next word in the model. 
+
+## Plans for prediction algorithm and Shiny App
+
+I plan to create an algorithm which predicts the next word by looking at a combination of N-grams leading up to that word. For example, if the previous 3 words are part of a popular 4-gram, then the 4th word would be suggested accordingly. If the previous 3 words are not part of any 4-gram, the previous 2 words would be analyzed to see if they are part of a popular 3-gram, and so on.
+
+I would also like to change the predicted word, based on the letters user has already typed. This could just be based on the popularity of 1-grams (single words), or various n-grams leading up to that word. 
+
+In the app, I plan to show the easiest computation first, and update the suggestions if more complex computations are done by the time the user types. This will probably help with the latency of the suggestions. 
+
