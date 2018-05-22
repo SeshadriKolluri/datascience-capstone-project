@@ -130,7 +130,7 @@ top_words = freq_table_1grams$word_1[1:50]
 getPredictions <- function(str){
   tokens <- tokens(x = char_tolower(str))
   tokens <- char_wordstem(rev(rev(tokens[[1]])[1:3]), language = "english")
-  
+
   next_words <- predict4thWord(tokens[1], tokens[2], tokens[3])
   if(any(is.na(next_words))){
     next_words <- predict3rdWord(tokens[2], tokens[3])
@@ -149,4 +149,12 @@ getPredictions("Ohhhhh #PointBreak is on tomorrow. Love that film and haven't se
 
 getPredcitions("The guy in front of me just bought a pound of bacon, a bouquet, and a case of")
 
+write.csv(freq_table_4grams,file = 'freq_table_4grams.csv',row.names = FALSE,quote = FALSE)
+write.csv(freq_table_3grams,file = 'freq_table_3grams.csv',row.names = FALSE,quote = FALSE)
+write.csv(freq_table_2grams,file = 'freq_table_2grams.csv',row.names = FALSE,quote = FALSE)
+write.csv(freq_table_1grams,file = 'freq_table_1grams.csv',row.names = FALSE,quote = FALSE)
 
+saveRDS(freq_table_1grams,'freq_table_1grams.RDS')
+saveRDS(freq_table_2grams,'freq_table_2grams.RDS')
+saveRDS(freq_table_3grams,'freq_table_3grams.RDS')
+saveRDS(freq_table_4grams,'freq_table_4grams.RDS')
